@@ -1,0 +1,7 @@
+chest-xray-pneumonia.zip
+.venv/
+.vscode/
+__pycache__/
+*.pyc
+
+
