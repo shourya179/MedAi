@@ -90,7 +90,7 @@ with col_upload:
 
     if uploaded_file:
         image = Image.open(uploaded_file).convert('RGB')
-        st.image(image, caption="Uploaded X-Ray", use_column_width=True)
+        st.image(image, caption="Uploaded X-Ray", use_container_width=True)
     else:
         st.markdown("""
         <div class="upload-box">
