@@ -1,0 +1,9 @@
+streamlit
+torch
+torchvision
+scikit-learn
+pandas
+numpy
+Pillow
+ollama
+imbalanced-learn
