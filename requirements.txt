@@ -5,5 +5,5 @@ scikit-learn
 pandas
 numpy
 Pillow
-ollama
+groq
 imbalanced-learn
