@@ -1,5 +1,5 @@
 import streamlit as st
-from huggingface_hub import InferenceClient
+from groq import Groq
 
 st.set_page_config(page_title="Health Chat — MediAI", page_icon="💬", layout="wide")
 
@@ -22,34 +22,27 @@ Always recommend consulting a real doctor for diagnosis and treatment.
 Keep responses clear, concise and easy to understand.
 Never diagnose — only educate and inform."""
 
-# load client using secret
 @st.cache_resource
 def get_client():
-    return InferenceClient(
-        model="meta-llama/Meta-Llama-3-8B-Instruct",
-        token=st.secrets["HF_TOKEN"]   # ← paste your token in Streamlit Secrets
-    )
+    return Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 client = get_client()
 
-# header
 if st.button("← Back to MediAI"):
     st.switch_page("app.py")
 
 st.markdown("""
 <div class="page-header">
     <h2>💬 AI Health Assistant</h2>
-    <p>Ask health questions in plain English. Powered by Llama3 via Hugging Face.</p>
+    <p>Ask health questions in plain English. Powered by Llama3 via Groq.</p>
 </div>
 """, unsafe_allow_html=True)
 
-# session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "quick_q" not in st.session_state:
     st.session_state.quick_q = None
 
-# quick questions
 st.markdown('<div class="quick-label">Quick questions</div>', unsafe_allow_html=True)
 
 quick_questions = [
@@ -68,24 +61,20 @@ for i, q in enumerate(quick_questions):
 
 st.markdown("---")
 
-# pick up quick question
 if st.session_state.quick_q:
     user_input = st.session_state.quick_q
     st.session_state.quick_q = None
 else:
     user_input = None
 
-# display chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# typed input
 typed_input = st.chat_input("Ask a health question...")
 if typed_input:
     user_input = typed_input
 
-# process input
 if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
@@ -95,7 +84,6 @@ if user_input:
         "content": user_input
     })
 
-    # build messages
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for msg in st.session_state.messages:
         full_messages.append({
@@ -103,16 +91,15 @@ if user_input:
             "content": msg["content"]
         })
 
-    # stream response
     with st.chat_message("assistant"):
         placeholder = st.empty()
         full_reply  = ""
 
         with st.spinner("Thinking..."):
             stream = client.chat.completions.create(
+                model="llama3-8b-8192",
                 messages=full_messages,
-                stream=True,
-                max_tokens=1024
+                stream=True
             )
 
         for chunk in stream:
@@ -127,7 +114,6 @@ if user_input:
         "content": full_reply
     })
 
-# clear button
 if st.session_state.messages:
     if st.button("🗑️ Clear conversation"):
         st.session_state.messages = []
