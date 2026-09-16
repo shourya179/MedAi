@@ -22,14 +22,16 @@ Always recommend consulting a real doctor for diagnosis and treatment.
 Keep responses clear, concise and easy to understand.
 Never diagnose — only educate and inform."""
 
+# ── load Claude client (cached) ───────────────────────────────
 @st.cache_resource
 def get_client():
     return anthropic.Anthropic(
-        api_key=st.secrets["ANTHROPIC_API_KEY"]
+        api_key=st.secrets["ANTHROPIC_API_KEY"]  # paste key in Streamlit Secrets
     )
 
 client = get_client()
 
+# ── header ────────────────────────────────────────────────────
 if st.button("← Back to MediAI"):
     st.switch_page("app.py")
 
@@ -40,11 +42,13 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── session state ─────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "quick_q" not in st.session_state:
     st.session_state.quick_q = None
 
+# ── quick questions above chat bar ────────────────────────────
 st.markdown('<div class="quick-label">Quick questions</div>', unsafe_allow_html=True)
 
 quick_questions = [
@@ -63,20 +67,24 @@ for i, q in enumerate(quick_questions):
 
 st.markdown("---")
 
+# ── pick up quick question ────────────────────────────────────
 if st.session_state.quick_q:
     user_input = st.session_state.quick_q
     st.session_state.quick_q = None
 else:
     user_input = None
 
+# ── display chat history ──────────────────────────────────────
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+# ── typed input ───────────────────────────────────────────────
 typed_input = st.chat_input("Ask a health question...")
 if typed_input:
     user_input = typed_input
 
+# ── process input ─────────────────────────────────────────────
 if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
@@ -86,7 +94,7 @@ if user_input:
         "content": user_input
     })
 
-    # claude uses separate system prompt
+    # build messages for Claude
     full_messages = []
     for msg in st.session_state.messages:
         full_messages.append({
@@ -94,27 +102,34 @@ if user_input:
             "content": msg["content"]
         })
 
+    # stream response from Claude
     with st.chat_message("assistant"):
         placeholder = st.empty()
         full_reply  = ""
 
-        with client.messages.stream(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=full_messages
-        ) as stream:
-            for text in stream.text_stream:
-                full_reply += text
-                placeholder.markdown(full_reply + "▌")
+        try:
+            with client.messages.stream(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1024,
+                system=SYSTEM_PROMPT,
+                messages=full_messages
+            ) as stream:
+                for text in stream.text_stream:
+                    full_reply += text
+                    placeholder.markdown(full_reply + "▌")
 
-        placeholder.markdown(full_reply)
+            placeholder.markdown(full_reply)
+
+        except Exception as e:
+            st.error(f"Error: {e}")
+            st.stop()
 
     st.session_state.messages.append({
         "role": "assistant",
         "content": full_reply
     })
 
+# ── clear button ──────────────────────────────────────────────
 if st.session_state.messages:
     if st.button("🗑️ Clear conversation"):
         st.session_state.messages = []
