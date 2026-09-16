@@ -1,5 +1,5 @@
 import streamlit as st
-from groq import Groq
+import anthropic
 
 st.set_page_config(page_title="Health Chat — MediAI", page_icon="💬", layout="wide")
 
@@ -24,7 +24,9 @@ Never diagnose — only educate and inform."""
 
 @st.cache_resource
 def get_client():
-    return Groq(api_key=st.secrets["GROQ_API_KEY"])
+    return anthropic.Anthropic(
+        api_key=st.secrets["ANTHROPIC_API_KEY"]
+    )
 
 client = get_client()
 
@@ -34,7 +36,7 @@ if st.button("← Back to MediAI"):
 st.markdown("""
 <div class="page-header">
     <h2>💬 AI Health Assistant</h2>
-    <p>Ask health questions in plain English. Powered by Llama3 via Groq.</p>
+    <p>Ask health questions in plain English. Powered by Claude AI.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -84,7 +86,8 @@ if user_input:
         "content": user_input
     })
 
-    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # claude uses separate system prompt
+    full_messages = []
     for msg in st.session_state.messages:
         full_messages.append({
             "role": msg["role"],
@@ -95,17 +98,15 @@ if user_input:
         placeholder = st.empty()
         full_reply  = ""
 
-        with st.spinner("Thinking..."):
-            stream = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=full_messages,
-                stream=True
-            )
-
-        for chunk in stream:
-            word        = chunk.choices[0].delta.content or ""
-            full_reply += word
-            placeholder.markdown(full_reply + "▌")
+        with client.messages.stream(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
+            messages=full_messages
+        ) as stream:
+            for text in stream.text_stream:
+                full_reply += text
+                placeholder.markdown(full_reply + "▌")
 
         placeholder.markdown(full_reply)
 
