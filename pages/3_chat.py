@@ -1,5 +1,6 @@
 import streamlit as st
-import anthropic
+from google import genai
+from google.genai import types
 
 st.set_page_config(page_title="Health Chat — MediAI", page_icon="💬", layout="wide")
 
@@ -22,14 +23,25 @@ Always recommend consulting a real doctor for diagnosis and treatment.
 Keep responses clear, concise and easy to understand.
 Never diagnose — only educate and inform."""
 
-# ── load Claude client (cached) ───────────────────────────────
+# ── load Gemini client (cached) ───────────────────────────────
 @st.cache_resource
 def get_client():
-    return anthropic.Anthropic(
-        api_key=st.secrets["ANTHROPIC_API_KEY"]  # paste key in Streamlit Secrets
-    )
+    return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])  # paste key in Streamlit Secrets
+
 
 client = get_client()
+
+
+@st.cache_resource
+def get_chat():
+    return client.chats.create(
+        model="gemini-2.5-flash",
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT
+        )
+    )
+
+chat = get_chat()
 
 # ── header ────────────────────────────────────────────────────
 if st.button("← Back to MediAI"):
@@ -38,7 +50,7 @@ if st.button("← Back to MediAI"):
 st.markdown("""
 <div class="page-header">
     <h2>💬 AI Health Assistant</h2>
-    <p>Ask health questions in plain English. Powered by Claude AI.</p>
+    <p>Ask health questions in plain English. Powered by Gemini AI.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -94,29 +106,18 @@ if user_input:
         "content": user_input
     })
 
-    # build messages for Claude
-    full_messages = []
-    for msg in st.session_state.messages:
-        full_messages.append({
-            "role": msg["role"],
-            "content": msg["content"]
-        })
-
-    # stream response from Claude
+    # stream response from Gemini
     with st.chat_message("assistant"):
         placeholder = st.empty()
         full_reply  = ""
 
         try:
-            with client.messages.stream(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=1024,
-                system=SYSTEM_PROMPT,
-                messages=full_messages
-            ) as stream:
-                for text in stream.text_stream:
-                    full_reply += text
-                    placeholder.markdown(full_reply + "▌")
+            with st.spinner("Thinking..."):
+                response = chat.send_message_stream(user_input)
+
+            for chunk in response:
+                full_reply += chunk.text
+                placeholder.markdown(full_reply + "▌")
 
             placeholder.markdown(full_reply)
 
@@ -133,6 +134,7 @@ if user_input:
 if st.session_state.messages:
     if st.button("🗑️ Clear conversation"):
         st.session_state.messages = []
+        chat = get_chat()
         st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
