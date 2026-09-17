@@ -1,6 +1,5 @@
 import streamlit as st
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 st.set_page_config(page_title="Health Chat — MediAI", page_icon="💬", layout="wide")
 
@@ -23,25 +22,17 @@ Always recommend consulting a real doctor for diagnosis and treatment.
 Keep responses clear, concise and easy to understand.
 Never diagnose — only educate and inform."""
 
-# ── load Gemini client (cached) ───────────────────────────────
-@st.cache_resource
-def get_client():
-    return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])  # paste key in Streamlit Secrets
-
-
-client = get_client()
-
+# ── configure Gemini ──────────────────────────────────────────
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 @st.cache_resource
-def get_chat():
-    return client.chats.create(
-        model_name="gemini-3.6-flash",
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT
-        )
+def get_model():
+    return genai.GenerativeModel(
+        model_name="gemini-1.5-flash-latest",
+        system_instruction=SYSTEM_PROMPT
     )
 
-chat = get_chat()
+model = get_model()
 
 # ── header ────────────────────────────────────────────────────
 if st.button("← Back to MediAI"):
@@ -57,10 +48,12 @@ st.markdown("""
 # ── session state ─────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "chat_session" not in st.session_state:
+    st.session_state.chat_session = model.start_chat(history=[])
 if "quick_q" not in st.session_state:
     st.session_state.quick_q = None
 
-# ── quick questions above chat bar ────────────────────────────
+# ── quick questions ───────────────────────────────────────────
 st.markdown('<div class="quick-label">Quick questions</div>', unsafe_allow_html=True)
 
 quick_questions = [
@@ -106,14 +99,15 @@ if user_input:
         "content": user_input
     })
 
-    # stream response from Gemini
     with st.chat_message("assistant"):
         placeholder = st.empty()
         full_reply  = ""
 
         try:
-            with st.spinner("Thinking..."):
-                response = chat.send_message_stream(user_input)
+            response = st.session_state.chat_session.send_message(
+                user_input,
+                stream=True
+            )
 
             for chunk in response:
                 full_reply += chunk.text
@@ -134,7 +128,7 @@ if user_input:
 if st.session_state.messages:
     if st.button("🗑️ Clear conversation"):
         st.session_state.messages = []
-        chat = get_chat()
+        st.session_state.chat_session = model.start_chat(history=[])
         st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
