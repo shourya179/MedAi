@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 st.set_page_config(page_title="Health Chat — MediAI", page_icon="💬", layout="wide")
 
@@ -22,18 +23,12 @@ Always recommend consulting a real doctor for diagnosis and treatment.
 Keep responses clear, concise and easy to understand.
 Never diagnose — only educate and inform."""
 
-
-# ── configure Gemini ──────────────────────────────────────────
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-
+# ── configure Gemini client ───────────────────────────────────
 @st.cache_resource
-def get_model():
-    return genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=SYSTEM_PROMPT
-    )
+def get_client():
+    return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-model = get_model()
+client = get_client()
 
 # ── header ────────────────────────────────────────────────────
 if st.button("← Back to MediAI"):
@@ -49,12 +44,10 @@ st.markdown("""
 # ── session state ─────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "chat_session" not in st.session_state:
-    st.session_state.chat_session = model.start_chat(history=[])
 if "quick_q" not in st.session_state:
     st.session_state.quick_q = None
 
-# ── quick questions ───────────────────────────────────────────
+# ── quick questions above chat bar ────────────────────────────
 st.markdown('<div class="quick-label">Quick questions</div>', unsafe_allow_html=True)
 
 quick_questions = [
@@ -100,19 +93,41 @@ if user_input:
         "content": user_input
     })
 
+    # build conversation history for Gemini
+    history = []
+    for msg in st.session_state.messages[:-1]:
+        history.append(
+            types.Content(
+                role=msg["role"],
+                parts=[types.Part(text=msg["content"])]
+            )
+        )
+
+    # current message
+    current = types.Content(
+        role="user",
+        parts=[types.Part(text=user_input)]
+    )
+
     with st.chat_message("assistant"):
         placeholder = st.empty()
         full_reply  = ""
 
         try:
-            response = st.session_state.chat_session.send_message(
-                user_input,
-                stream=True
+            response = client.models.generate_content_stream(
+                model="gemini-3.6-flash",
+                contents=history + [current],
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    max_output_tokens=1024,
+                    temperature=0.7
+                )
             )
 
             for chunk in response:
-                full_reply += chunk.text
-                placeholder.markdown(full_reply + "▌")
+                if chunk.text:
+                    full_reply += chunk.text
+                    placeholder.markdown(full_reply + "▌")
 
             placeholder.markdown(full_reply)
 
@@ -129,7 +144,6 @@ if user_input:
 if st.session_state.messages:
     if st.button("🗑️ Clear conversation"):
         st.session_state.messages = []
-        st.session_state.chat_session = model.start_chat(history=[])
         st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
