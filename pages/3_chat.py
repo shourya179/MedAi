@@ -35,7 +35,7 @@ client = get_client()
 @st.cache_resource
 def get_chat():
     return client.chats.create(
-        model="gemini-2.5-flash",
+        model_name="gemini-3.6-flash",
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT
         )
