@@ -21,12 +21,7 @@ You help users understand health conditions, symptoms, and general wellness advi
 Always recommend consulting a real doctor for diagnosis and treatment.
 Keep responses clear, concise and easy to understand.
 Never diagnose — only educate and inform."""
-# debug — find available models
-st.write("Available models:")
-for m in genai.list_models():
-    if "generateContent" in m.supported_generation_methods:
-        st.write(m.name)
-st.stop()
+
 
 # ── configure Gemini ──────────────────────────────────────────
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
@@ -34,7 +29,7 @@ genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 @st.cache_resource
 def get_model():
     return genai.GenerativeModel(
-        model_name="gemini-2.0-flash-exp",
+        model_name="gemini-2.5-flash",
         system_instruction=SYSTEM_PROMPT
     )
 
